@@ -13,8 +13,18 @@
 - 環境変数
 
 ```
+export _sql_gc_pj_id='Your Cloud SQL Instance of Google Cloud ID'
 export _workflow_gc_pj_id='Your Cloud Workflow of Google Cloud ID'
 export _scheduler_gc_pj_id='Your Cloud Scheduler of Google Cloud ID'
+```
+```
+### Cloud Workflow
+export _workflow_sa_name="sa-workflow-sql"
+export _workflow_sa_email="${_workflow_sa_name}@${_workflow_gc_pj_id}.iam.gserviceaccount.com"
+
+### Cloud Scheduler
+export _scheduler_sa_name="sa-schd-workflow"
+export _scheduler_sa_email="${_scheduler_sa_name}@${_scheduler_gc_pj_id}.iam.gserviceaccount.com"
 ```
 
 - API の有効化
@@ -24,18 +34,6 @@ gcloud services enable workflows.googleapis.com \
   cloudscheduler.googleapis.com \
   sqladmin.googleapis.com \
   --project ${_workflow_gc_pj_id}
-```
-
-- Workflows/Scheduler 用の Service Account の作成と Role を付与
-
-```
-### Cloud Workflow
-export _workflow_sa_name="sa-workflow-sql"
-export _workflow_sa_email="${_workflow_sa_name}@${_workflow_gc_pj_id}.iam.gserviceaccount.com"
-
-### Cloud Scheduler
-export _scheduler_sa_name="sa-schd-workflow"
-export _scheduler_sa_email="${_scheduler_sa_name}@${_scheduler_gc_pj_id}.iam.gserviceaccount.com"
 ```
 
 ### Service Account を作成
@@ -85,7 +83,7 @@ gcloud projects add-iam-policy-binding ${_workflow_gc_pj_id} \
 
 ```
 gcloud workflows deploy sql-periodically-starting-and-stopping \
-  --source=sql-periodically-starting-and-stopping.yaml \
+  --source=workflow.yaml \
   --location=asia-northeast1 \
   --service-account=${_workflow_sa_email} \
   --project ${_workflow_gc_pj_id}
@@ -93,26 +91,27 @@ gcloud workflows deploy sql-periodically-starting-and-stopping \
 
 ### Cloud Scheduler ジョブの作成
 
-- 停止ジョブ（金曜 22:00）
 
-```
-gcloud scheduler jobs create http stop-cloudsql-job \
-  --schedule="0 22 * * 5" \
-  --time-zone="Asia/Tokyo" \
-  --location="asia-northeast1" \
-  --uri="https://workflowexecutions.googleapis.com/v1/projects/${PROJECT_ID}/locations/asia-northeast1/workflows/manage-cloudsql-workflow:execute" \
-  --message-body="{\"argument\": \"{\\\"targetState\\\": \\\"NEVER\\\"}\"}" \
-  --oauth-service-account-email=${SCHEDULER_SA_EMAIL}
-```
-
-- 起動ジョブ（月曜 08:00）
+- 起動ジョブ（月曜~金曜 08:00）
 
 ```
 gcloud scheduler jobs create http start-cloudsql-job \
-  --schedule="0 8 * * 1" \
+  --schedule="0 8 * * 1-5" \
   --time-zone="Asia/Tokyo" \
   --location="asia-northeast1" \
-  --uri="https://workflowexecutions.googleapis.com/v1/projects/${PROJECT_ID}/locations/asia-northeast1/workflows/manage-cloudsql-workflow:execute" \
+  --uri="https://workflowexecutions.googleapis.com/v1/projects/${_workflow_gc_pj_id}/locations/asia-northeast1/workflows/sql-periodically-starting-and-stopping:execute" \
   --message-body="{\"argument\": \"{\\\"targetState\\\": \\\"ALWAYS\\\"}\"}" \
-  --oauth-service-account-email=${SCHEDULER_SA_EMAIL}
+  --oauth-service-account-email=${_scheduler_sa_email}
+```
+
+- 停止ジョブ（毎日 20:00）
+
+```
+gcloud scheduler jobs create http stop-cloudsql-job \
+  --schedule="0 20 * * *" \
+  --time-zone="Asia/Tokyo" \
+  --location="asia-northeast1" \
+  --uri="https://workflowexecutions.googleapis.com/v1/projects/${_workflow_gc_pj_id}/locations/asia-northeast1/workflows/sql-periodically-starting-and-stopping:execute" \
+  --message-body="{\"argument\": \"{\\\"targetState\\\": \\\"NEVER\\\"}\"}" \
+  --oauth-service-account-email=${_scheduler_sa_email}
 ```
