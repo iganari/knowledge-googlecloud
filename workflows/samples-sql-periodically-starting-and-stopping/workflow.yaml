@@ -1,12 +1,13 @@
+# workflow.yaml
 main:
   params: [args]
   steps:
     - init:
         assign:
-          # env.yaml から対象のプロジェクトと設定を取得
-          - targetProjectId: ${sys.get_env("TARGET_PROJECT_ID")}
-          - instanceId: ${sys.get_env("INSTANCE_ID")}
-          - slackWebhookUrl: ${sys.get_env("SLACK_WEBHOOK_URL")}
+          # env.yaml から対象のプロジェクトと設定を取得（変数名を変更）
+          - targetProjectId: ${sys.get_env("_SQL_PROJECT_ID")}
+          - instanceId: ${sys.get_env("_SQL_INSTANCE_ID")}
+          - slackWebhookUrl: ${sys.get_env("_SLACK_WEBHOOK_URL")}
           
           # Scheduler （実行引数）からの取得
           - targetState: ${args.targetState}
