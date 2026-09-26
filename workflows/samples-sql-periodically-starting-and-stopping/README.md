@@ -56,105 +56,37 @@ gcloud iam service-accounts create ${SCHEDULER_SA_NAME} \
   --project ${_scheduler_gc_pj_id}
 ```
 
-### Service Account に Role 
+### Service Account に Role を付与
 
-- Workflows に Cloud SQL 管理者権限を付与（起動・停止・ステータス確認に必要）
-
-```
-gcloud projects add-iam-policy-binding ${_workflows_gc_pj_id} \
-    --member="serviceAccount:${_workflow_sa_email}" \
-    --role="roles/cloudsql.admin"
-
-# Scheduler に Workflows の呼び出し権限を付与
-gcloud projects add-iam-policy-binding ${_workflows_gc_pj_id} \
-    --member="serviceAccount:${_workflow_sa_email}" \
-    --role="roles/workflows.invoker"
-
-# （推奨）Workflows の実行ログを出力するための権限
-gcloud projects add-iam-policy-binding ${_workflows_gc_pj_id} \
-    --member="serviceAccount:${_workflow_sa_email}" \
-    --role="roles/logging.logWriter"
-```
-
-
+- Workflow に Cloud SQL 管理者権限を付与（起動・停止・ステータス確認に必要）
 
 ```
-main:
-  params: [args]
-  steps:
-    - init:
-        assign:
-          - projectId: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
-          - instanceId: "your-sql-instance-id" # 対象のCloud SQLインスタンス名
-          - targetState: ${args.targetState}   # Schedulerから渡された引数を使う
-          - slackWebhookUrl: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+# Cloud SQL の操作・管理権限
+gcloud projects add-iam-policy-binding ${_workflow_gc_pj_id} \
+  --member="serviceAccount:${WORKFLOW_SA_EMAIL}" \
+  --role="roles/cloudsql.admin"
 
-    # 1. 現在の状態を取得（事前チェック）
-    - check_current_state:
-        call: googleapis.sqladmin.v1.instances.get
-        args:
-          project: ${projectId}
-          instance: ${instanceId}
-        result: instanceInfo
-        
-    # 2. すでにその状態であれば何もせず終了（エラーにしない）
-    - skip_if_already_in_state:
-        switch:
-          - condition: ${instanceInfo.settings.activationPolicy == targetState}
-            return: "Already in target state. Skipped."
+# 実行ログ出力権限
+gcloud projects add-iam-policy-binding ${_workflow_gc_pj_id} \
+  --member="serviceAccount:${WORKFLOW_SA_EMAIL}" \
+  --role="roles/logging.logWriter"
+```
 
-    # 3. 起動 / 停止の指示を発行
-    - update_instance:
-        try:
-          call: googleapis.sqladmin.v1.instances.patch
-          args:
-            project: ${projectId}
-            instance: ${instanceId}
-            body:
-              settings:
-                activationPolicy: ${targetState}
-          result: operation
-        retry: ${http.default_retry}
-        except:
-          as: e
-          steps:
-            - notify_error:
-                call: http.post
-                args:
-                  url: ${slackWebhookUrl}
-                  body:
-                    text: ${" Cloud SQL 変更API呼び出し失敗: " + e.message}
-                return: "Failed to update instance"
+- Scheduler 用 SA への権限付与
 
-    # 4. 処理が完了するまでループで待機（タイムアウト対策）
-    - wait_for_completion:
-        call: sys.sleep
-        args:
-          seconds: 10
-    - check_operation_status:
-        call: googleapis.sqladmin.v1.operations.get
-        args:
-          project: ${projectId}
-          operation: ${operation.name}
-        result: opStatus
-    - evaluate_operation:
-        switch:
-          - condition: ${opStatus.status == "DONE"}
-            next: check_final_result
-          - condition: ${opStatus.status != "DONE"}
-            next: wait_for_completion
+```
+# Workflows の実行を呼び出す権限のみを付与
+gcloud projects add-iam-policy-binding ${_workflow_gc_pj_id} \
+  --member="serviceAccount:${_scheduler_sa_email}" \
+  --role="roles/workflows.invoker"
+```
 
-    # 5. Operation の最終判定
-    - check_final_result:
-        switch:
-          - condition: ${"error" in opStatus}
-            steps:
-              - notify_operation_failed:
-                  call: http.post
-                  args:
-                    url: ${slackWebhookUrl}
-                    body:
-                      text: ${" Cloud SQL のステータス変更処理がエラー終了しました: " + instanceId}
-                  return: "Operation Error"
-        return: "Successfully updated Cloud SQL state."
+### Workflows のデプロイ
+
+```
+gcloud workflows deploy sql-periodically-starting-and-stopping \
+  --source=sql-periodically-starting-and-stopping.yaml \
+  --location=asia-northeast1 \
+  --service-account=${_workflow_sa_email} \
+  --project ${_workflow_gc_pj_id}
 ```
