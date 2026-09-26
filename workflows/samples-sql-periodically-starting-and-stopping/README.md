@@ -90,3 +90,29 @@ gcloud workflows deploy sql-periodically-starting-and-stopping \
   --service-account=${_workflow_sa_email} \
   --project ${_workflow_gc_pj_id}
 ```
+
+### Cloud Scheduler ジョブの作成
+
+- 停止ジョブ（金曜 22:00）
+
+```
+gcloud scheduler jobs create http stop-cloudsql-job \
+  --schedule="0 22 * * 5" \
+  --time-zone="Asia/Tokyo" \
+  --location="asia-northeast1" \
+  --uri="https://workflowexecutions.googleapis.com/v1/projects/${PROJECT_ID}/locations/asia-northeast1/workflows/manage-cloudsql-workflow:execute" \
+  --message-body="{\"argument\": \"{\\\"targetState\\\": \\\"NEVER\\\"}\"}" \
+  --oauth-service-account-email=${SCHEDULER_SA_EMAIL}
+```
+
+- 起動ジョブ（月曜 08:00）
+
+```
+gcloud scheduler jobs create http start-cloudsql-job \
+  --schedule="0 8 * * 1" \
+  --time-zone="Asia/Tokyo" \
+  --location="asia-northeast1" \
+  --uri="https://workflowexecutions.googleapis.com/v1/projects/${PROJECT_ID}/locations/asia-northeast1/workflows/manage-cloudsql-workflow:execute" \
+  --message-body="{\"argument\": \"{\\\"targetState\\\": \\\"ALWAYS\\\"}\"}" \
+  --oauth-service-account-email=${SCHEDULER_SA_EMAIL}
+```

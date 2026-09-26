@@ -3,31 +3,34 @@ main:
   steps:
     - init:
         assign:
-          - projectId: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
-          - instanceId: "your-sql-instance-id" # 対象のCloud SQLインスタンス名
-          - targetState: ${args.targetState}   # Schedulerから渡された引数を使う
-          - slackWebhookUrl: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+          # env.yaml から対象のプロジェクトと設定を取得
+          - targetProjectId: ${sys.get_env("TARGET_PROJECT_ID")}
+          - instanceId: ${sys.get_env("INSTANCE_ID")}
+          - slackWebhookUrl: ${sys.get_env("SLACK_WEBHOOK_URL")}
+          
+          # Scheduler （実行引数）からの取得
+          - targetState: ${args.targetState}
 
-    # 1. 現在の状態を取得（事前チェック）
+    # 1. 現在の状態を取得（クロスプロジェクト）
     - check_current_state:
         call: googleapis.sqladmin.v1.instances.get
         args:
-          project: ${projectId}
+          project: ${targetProjectId}
           instance: ${instanceId}
         result: instanceInfo
         
-    # 2. すでにその状態であれば何もせず終了（エラーにしない）
+    # 2. すでにその状態であれば何もせず終了
     - skip_if_already_in_state:
         switch:
           - condition: ${instanceInfo.settings.activationPolicy == targetState}
             return: "Already in target state. Skipped."
 
-    # 3. 起動 / 停止の指示を発行
+    # 3. 起動 / 停止の指示を発行（クロスプロジェクト）
     - update_instance:
         try:
           call: googleapis.sqladmin.v1.instances.patch
           args:
-            project: ${projectId}
+            project: ${targetProjectId}
             instance: ${instanceId}
             body:
               settings:
@@ -45,7 +48,7 @@ main:
                     text: ${" Cloud SQL 変更API呼び出し失敗: " + e.message}
                 return: "Failed to update instance"
 
-    # 4. 処理が完了するまでループで待機（タイムアウト対策）
+    # 4. 処理が完了するまでループで待機（クロスプロジェクト）
     - wait_for_completion:
         call: sys.sleep
         args:
@@ -53,7 +56,7 @@ main:
     - check_operation_status:
         call: googleapis.sqladmin.v1.operations.get
         args:
-          project: ${projectId}
+          project: ${targetProjectId}
           operation: ${operation.name}
         result: opStatus
     - evaluate_operation:
@@ -73,6 +76,6 @@ main:
                   args:
                     url: ${slackWebhookUrl}
                     body:
-                      text: ${" Cloud SQL のステータス変更処理がエラー終了しました: " + instanceId}
+                      text: ${" Cloud SQL ステータス変更エラー (" + instanceId + ")"}
                   return: "Operation Error"
         return: "Successfully updated Cloud SQL state."
