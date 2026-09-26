@@ -17,13 +17,20 @@ export _sql_gc_pj_id='Your Cloud SQL Instance of Google Cloud ID'
 export _workflow_gc_pj_id='Your Cloud Workflow of Google Cloud ID'
 export _scheduler_gc_pj_id='Your Cloud Scheduler of Google Cloud ID'
 ```
+
+- 以下の略を使用します
+
+```
+sql-periodically-starting-and-stopping ===> sql-cycling
+```
+
 ```
 ### Cloud Workflow
-export _workflow_sa_name="sa-workflow-sql"
+export _workflow_sa_name="sa-workflow-sql-cycling"
 export _workflow_sa_email="${_workflow_sa_name}@${_workflow_gc_pj_id}.iam.gserviceaccount.com"
 
 ### Cloud Scheduler
-export _scheduler_sa_name="sa-schd-workflow"
+export _scheduler_sa_name="sa-schd-sql-cycling"
 export _scheduler_sa_email="${_scheduler_sa_name}@${_scheduler_gc_pj_id}.iam.gserviceaccount.com"
 ```
 
