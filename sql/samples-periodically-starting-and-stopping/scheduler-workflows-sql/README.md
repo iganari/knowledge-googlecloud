@@ -1,10 +1,10 @@
-# Cloud SQL を定期起動・停止するサンプル
+# 定期的に Cloud SQL Instance を起動・停止するサンプル
 
 ## 注意点
 
 :warning: 作成途中です :warning:
 
-## 構成図
+## 1. 構成図
 
 ```mermaid
 %%{init: {"flowchart": {"htmlLabels": false, "wrappingWidth": 300, "nodeSpacing": 60, "rankSpacing": 80}}}%%
@@ -19,12 +19,12 @@ flowchart LR
   workflow -->|"sqladmin.instances.patch"| sql
 ```
 
-### Cloud Scheduler の定期実行
+### 1-1. Cloud Scheduler の定期実行
 
-- 平日の 08:00 に「起動」の処理
+- 平日 08:00 に「起動」の処理
 - 毎日 20:00 に「停止」の処理
 
-### Cloud Workflows の flow の処理
+### 1-2. Cloud Workflows の flow の処理
 
 1. 現状確認
 2. すでに指定状態なら正常終了 (冪等性)
@@ -32,13 +32,15 @@ flowchart LR
 4. 完了までポーリング待機
 5. 失敗時は Slack 通知
 
-## 手順
+## 2. サンプル構築
 
-- 環境変数
+### 2-1. 環境変数を設定
+
+- 共通部分
 
 ```
 export _sql_gc_pj_id='Your Cloud SQL Instance of Google Cloud ID'
-export _workflow_gc_pj_id='Your Cloud Workflow of Google Cloud ID'
+export _workflows_gc_pj_id='Your Cloud Workflows of Google Cloud ID'
 export _scheduler_gc_pj_id='Your Cloud Scheduler of Google Cloud ID'
 ```
 
@@ -49,9 +51,9 @@ sql-periodically-starting-and-stopping ===> sql-cycling
 ```
 
 ```
-### Cloud Workflow
-export _workflow_sa_name="sa-workflow-sql-cycling"
-export _workflow_sa_email="${_workflow_sa_name}@${_workflow_gc_pj_id}.iam.gserviceaccount.com"
+### Cloud Workflows
+export _workflows_sa_name="sa-workflows-sql-cycling"
+export _workflows_sa_email="${_workflows_sa_name}@${_workflows_gc_pj_id}.iam.gserviceaccount.com"
 
 ### Cloud Scheduler
 export _scheduler_sa_name="sa-schd-sql-cycling"
@@ -64,7 +66,7 @@ export _scheduler_sa_email="${_scheduler_sa_name}@${_scheduler_gc_pj_id}.iam.gse
 gcloud services enable workflows.googleapis.com \
   cloudscheduler.googleapis.com \
   sqladmin.googleapis.com \
-  --project ${_workflow_gc_pj_id}
+  --project ${_workflows_gc_pj_id}
 ```
 
 ### Service Account を作成
