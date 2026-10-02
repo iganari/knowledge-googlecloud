@@ -1,0 +1,82 @@
+# workflow.yaml
+main:
+  params: [args]
+  steps:
+    - init:
+        assign:
+          # env.yaml から対象のプロジェクトと設定を取得（変数名を変更）
+          - targetProjectId: ${sys.get_env("_SQL_PROJECT_ID")}
+          - instanceId: ${sys.get_env("_SQL_INSTANCE_ID")}
+          - slackWebhookUrl: ${sys.get_env("_SLACK_WEBHOOK_URL")}
+          
+          # Scheduler （実行引数）からの取得
+          - targetState: ${args.targetState}
+
+    # 1. 現在の状態を取得（クロスプロジェクト）
+    - check_current_state:
+        call: googleapis.sqladmin.v1.instances.get
+        args:
+          project: ${targetProjectId}
+          instance: ${instanceId}
+        result: instanceInfo
+        
+    # 2. すでにその状態であれば何もせず終了
+    - skip_if_already_in_state:
+        switch:
+          - condition: ${instanceInfo.settings.activationPolicy == targetState}
+            return: "Already in target state. Skipped."
+
+    # 3. 起動 / 停止の指示を発行（クロスプロジェクト）
+    - update_instance:
+        try:
+          call: googleapis.sqladmin.v1.instances.patch
+          args:
+            project: ${targetProjectId}
+            instance: ${instanceId}
+            body:
+              settings:
+                activationPolicy: ${targetState}
+          result: operation
+        retry: ${http.default_retry}
+        except:
+          as: e
+          steps:
+            - notify_error:
+                call: http.post
+                args:
+                  url: ${slackWebhookUrl}
+                  body:
+                    text: ${" Cloud SQL 変更API呼び出し失敗: " + e.message}
+                return: "Failed to update instance"
+
+    # 4. 処理が完了するまでループで待機（クロスプロジェクト）
+    - wait_for_completion:
+        call: sys.sleep
+        args:
+          seconds: 10
+    - check_operation_status:
+        call: googleapis.sqladmin.v1.operations.get
+        args:
+          project: ${targetProjectId}
+          operation: ${operation.name}
+        result: opStatus
+    - evaluate_operation:
+        switch:
+          - condition: ${opStatus.status == "DONE"}
+            next: check_final_result
+          - condition: ${opStatus.status != "DONE"}
+            next: wait_for_completion
+
+    # 5. Operation の最終判定
+    - check_final_result:
+        switch:
+          - condition: ${"error" in opStatus}
+            steps:
+              - notify_operation_failed:
+                  call: http.post
+                  args:
+                    url: ${slackWebhookUrl}
+                    body:
+                      text: ${" Cloud SQL ステータス変更エラー (" + instanceId + ")"}
+                  return: "Operation Error"
+        return: "Successfully updated Cloud SQL state."
