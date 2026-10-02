@@ -1,4 +1,4 @@
-# Cloud SQL を定期的に起動・停止するサンプル
+# 定期的に Cloud SQL Instance を起動・停止するサンプル
 
 ```mermaid
 %%{init: {"flowchart": {"htmlLabels": false, "wrappingWidth": 300, "nodeSpacing": 60, "rankSpacing": 80}}}%%
@@ -13,4 +13,4 @@ flowchart LR
   workflow -->|"sqladmin.instances.patch"| sql
 ```
 
-詳細は Cloud SQL のところにあります -> 
+詳細は Cloud SQL のところにあります -> [定期的に Cloud SQL Instance を起動・停止するサンプル](../../sql/samples-periodically-starting-and-stopping/scheduler-workflows-sql/)
