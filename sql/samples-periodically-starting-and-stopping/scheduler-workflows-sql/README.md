@@ -4,6 +4,8 @@
 
 :warning: 作成途中です :warning:
 
+---> https://github.com/iganari/handson-scheduler-workflows-sql にてまとめている途中です
+
 ## 1. 構成図
 
 ```mermaid
