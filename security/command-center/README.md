@@ -6,7 +6,7 @@
 
 ## Standard Service Tier の設定方法
 
-:warning: UI が新しくなったため、以降のスクリーンショットは過去のものとなります(2026/10時点) :warning:
+:warning::warning::warning: UI が新しくなったため、以降のスクリーンショットは過去のものとなります(2026/10時点) :warning::warning::warning:
 
 <details>
 <summary>01. Security Command Center のページに行きます</summary>
